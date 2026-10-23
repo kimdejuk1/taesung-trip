@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>태성고 체험학습</title>
+<meta name="description" content="태성고 2학년 주제별 체험학습 팀별 일정과 버스·객실 안내">
+<meta name="theme-color" content="#0b2d47">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="체험학습">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root{ --brand:#0b2d47; --brand-2:#1f6fb2; }
+  html,body{margin:0;height:100%;background:var(--brand);font-family:'Noto Sans KR',system-ui,-apple-system,sans-serif}
+  body{display:flex;flex-direction:column}
+  .safe-top{height:env(safe-area-inset-top);background:var(--brand);flex:none}
+  iframe{flex:1;width:100%;border:0;background:#f2f4f8}
+  .bar{flex:none;display:none;align-items:center;gap:10px;padding:10px 14px;background:#fff;border-bottom:1px solid #dfe4ec;font-size:14px;color:#172131}
+  .bar.show{display:flex}
+  .bar img{width:36px;height:36px;border-radius:8px;flex:none}
+  .bar .t{flex:1;line-height:1.35}
+  .bar .t b{display:block;font-size:14px}
+  .bar .t span{font-size:12.5px;color:#5f6b7d}
+  .bar button{border:0;border-radius:8px;padding:8px 14px;font:inherit;font-weight:700;cursor:pointer}
+  .bar .go{background:var(--brand-2);color:#fff}
+  .bar .x{background:none;color:#5f6b7d;padding:8px 6px;font-size:18px;line-height:1}
+  .ios{position:fixed;inset:0;background:rgba(10,20,35,.55);display:none;align-items:flex-end;justify-content:center;z-index:20}
+  .ios.show{display:flex}
+  .ios .sheet{background:#fff;border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:22px 20px calc(22px + env(safe-area-inset-bottom));font-size:15px;color:#172131}
+  .ios h3{margin:0 0 12px;font-size:17px}
+  .ios ol{margin:0;padding-left:20px;line-height:1.9}
+  .ios .k{display:inline-block;border:1px solid #dfe4ec;border-radius:6px;padding:0 6px;font-size:13px;background:#f5f7fb}
+  .ios button{width:100%;margin-top:16px;border:0;border-radius:10px;padding:12px;font:inherit;font-weight:700;background:var(--brand-2);color:#fff}
+  .ios .arrow{text-align:center;font-size:28px;margin-top:6px;color:var(--brand-2)}
+</style>
+</head>
+<body>
+<div class="safe-top"></div>
+
+<div class="bar" id="installBar">
+  <img src="icons/icon-192.png" alt="">
+  <div class="t"><b>앱으로 설치하기</b><span>홈 화면에서 바로 열 수 있어요</span></div>
+  <button class="go" id="installBtn">설치</button>
+  <button class="x" id="closeBar" aria-label="닫기">✕</button>
+</div>
+
+<iframe id="app" title="태성고 체험학습" allow="clipboard-write"></iframe>
+
+<div class="ios" id="iosGuide">
+  <div class="sheet">
+    <h3>아이폰에서 앱으로 설치하기</h3>
+    <ol>
+      <li>화면 아래(또는 위)의 <span class="k">공유 ⬆︎</span> 버튼을 누르세요.</li>
+      <li>목록을 내려 <span class="k">홈 화면에 추가 ⊞</span>를 누르세요.</li>
+      <li>오른쪽 위 <span class="k">추가</span>를 누르면 끝!</li>
+    </ol>
+    <div class="arrow">⬇︎</div>
+    <button id="iosOk">확인</button>
+  </div>
+</div>
+
+<script>
+  // 앱스크립트 웹앱 주소 (배포 후 입력)
+  var APP_URL = 'https://script.google.com/macros/s/AKfycbyl1UkMZwVSOS3S_WzwEtHZNXq6yGh31m8QpRYLEpUyGcGFj2DkMz1wPVf9cfnNMogs/exec';
+  document.getElementById('app').src = APP_URL;
+
+  function store(k, v){ try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  var bar = document.getElementById('installBar');
+  var deferred = null;
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  }
+
+  // 안드로이드·크롬: 설치 버튼
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    deferred = e;
+    if (!standalone && load('hideBar') !== '1') bar.classList.add('show');
+  });
+  document.getElementById('installBtn').onclick = function(){
+    if (deferred) {
+      deferred.prompt();
+      deferred.userChoice.then(function(){ deferred = null; bar.classList.remove('show'); });
+    } else if (isIOS()) {
+      document.getElementById('iosGuide').classList.add('show');
+    }
+  };
+  document.getElementById('closeBar').onclick = function(){ bar.classList.remove('show'); store('hideBar', '1'); };
+  window.addEventListener('appinstalled', function(){ bar.classList.remove('show'); });
+
+  // 아이폰·아이패드(사파리): 홈 화면에 추가 안내
+  function isIOS(){
+    var ua = navigator.userAgent;
+    return /iPhone|iPad|iPod/.test(ua) || (ua.indexOf('Macintosh') >= 0 && 'ontouchend' in document);
+  }
+  if (isIOS() && !standalone && load('hideBar') !== '1') {
+    document.querySelector('#installBar .t span').textContent = '공유 → 홈 화면에 추가';
+    document.getElementById('installBtn').textContent = '방법 보기';
+    bar.classList.add('show');
+    if (load('iosShown') !== '1') { document.getElementById('iosGuide').classList.add('show'); store('iosShown', '1'); }
+  }
+  document.getElementById('iosOk').onclick = function(){ document.getElementById('iosGuide').classList.remove('show'); };
+</script>
+</body>
+</html>
