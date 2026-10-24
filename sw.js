@@ -1,5 +1,5 @@
 // 설치용 껍데기 페이지만 캐시합니다. 일정·배정 내용은 항상 앱스크립트에서 새로 불러옵니다.
-const CACHE = 'trip-shell-v3';
+const CACHE = 'trip-shell-v4';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

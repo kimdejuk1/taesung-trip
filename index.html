@@ -40,6 +40,9 @@
   .ios .teams{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
   .ios .teams button{margin:0;padding:12px 0;background:#eef2f7;color:#172131;font-weight:500}
   .ios .teams button.on{background:var(--brand-2);color:#fff;font-weight:700}
+  .ios .who{display:flex;gap:8px;margin-top:10px}
+  .ios .who input{flex:1;min-width:0;border:1px solid #dfe4ec;border-radius:10px;padding:11px 12px;font:inherit;color:#172131;background:#fff}
+  .ios .who #pushSid{flex:0 0 38%}
   .ios p{margin:0 0 10px;line-height:1.6;color:#3b4656;font-size:14px}
   .ios .sub{background:none;color:#5f6b7d;margin-top:6px;font-weight:500}
   .fab{position:fixed;right:10px;top:calc(env(safe-area-inset-top) + 8px);z-index:15;display:none;align-items:center;gap:4px;border:1px solid rgba(255,255,255,.35);border-radius:16px;padding:5px 11px;font:700 12.5px 'Noto Sans KR',system-ui,sans-serif;background:rgba(11,45,71,.55);color:#fff;cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
@@ -87,6 +90,10 @@
     <p id="pushDesc">내 팀을 고르면 전체 알림과 우리 팀 알림을 받을 수 있어요. 다음 화면에서 <b>허용</b>을 눌러 주세요.</p>
     <div class="teams" id="pushTeams">
       <button data-t="A">A팀</button><button data-t="B">B팀</button><button data-t="C">C팀</button><button data-t="교사">교사</button>
+    </div>
+    <div class="who">
+      <input id="pushSid" inputmode="numeric" maxlength="5" placeholder="학번 (예: 20528)" autocomplete="off">
+      <input id="pushName" maxlength="30" placeholder="이름" autocomplete="off">
     </div>
     <button id="pushOk">알림 켜기</button>
     <button class="sub" id="pushLater">나중에</button>
@@ -171,14 +178,18 @@
       : '내 팀을 고르면 전체 알림과 우리 팀 알림을 받을 수 있어요. 다음 화면에서 <b>허용</b>을 눌러 주세요.';
     document.getElementById('pushOk').textContent = change ? '이 팀으로 바꾸기' : '알림 켜기';
     document.getElementById('pushLater').textContent = change ? '닫기' : '나중에';
+    var sidEl = document.getElementById('pushSid'), nmEl = document.getElementById('pushName');
+    if (!nmEl.value) { sidEl.value = load('pushSid') || load('mySid') || ''; nmEl.value = load('pushName') || load('myName') || ''; }
     markTeams(); pushSheet.classList.add('show');
   }
   function markTeams(){
     document.querySelectorAll('#pushTeams button').forEach(function(b){ b.classList.toggle('on', b.dataset.t === pickTeam); });
+    document.getElementById('pushSid').style.display = pickTeam === '교사' ? 'none' : '';   // 교사는 이름만
   }
   document.querySelectorAll('#pushTeams button').forEach(function(b){ b.onclick = function(){ pickTeam = b.dataset.t; markTeams(); }; });
 
-  function subscribe(team){
+  function subscribe(team, o){
+    o = o || {};
     var fb;
     return Promise.all([
       import('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-app.js'),
@@ -194,13 +205,18 @@
       });
     }).then(function(token){
       if (!token) throw new Error('알림 등록에 실패했습니다.');
-      return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ api: 'push-register', token: token, team: team, old: load('pushToken') || '' }) })
+      return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ api: 'push-register', token: token, team: team, old: load('pushToken') || '', sid: o.sid || '', name: o.name || '', refresh: !!o.refresh }) })
         .then(function(r){ return r.json(); })
-        .then(function(r){ if (!r.ok) throw new Error(r.error || '알림 등록에 실패했습니다.'); store('pushToken', token); store('pushTeam', team); });
+        .then(function(r){
+          if (!r.ok) throw new Error(r.error || '알림 등록에 실패했습니다.');
+          if (r.removed) { store('pushTeam', null); store('pushToken', null); return r; }   // 선생님이 목록에서 삭제함
+          store('pushToken', token); store('pushTeam', r.team); store('pushSid', r.sid || ''); store('pushName', r.name || '');
+          return r;
+        });
     });
   }
 
-  document.getElementById('pushBtn').onclick = function(){ openSheet(false); };
+  document.getElementById('pushBtn').onclick = function(){ openSheet(!!load('pushTeam')); };
   document.getElementById('pushFab').onclick = function(){ openSheet(true); };
   document.getElementById('pushClose').onclick = function(){ pushBar.classList.remove('show'); store('pushLater', String(Date.now())); };
   document.getElementById('pushLater').onclick = function(){
@@ -209,11 +225,15 @@
   };
   document.getElementById('pushOk').onclick = function(){
     if (TEAMS.indexOf(pickTeam) < 0){ toast('먼저 팀을 골라 주세요.'); return; }
+    var sid = document.getElementById('pushSid').value.trim(), name = document.getElementById('pushName').value.trim();
+    if (pickTeam === '교사') sid = '';
+    else if (!/^\d{5}$/.test(sid)) { toast('학번 5자리를 입력해 주세요.'); return; }
+    if (name.length < 2) { toast('이름을 입력해 주세요.'); return; }
     var btn = this, change = !!load('pushTeam'); btn.disabled = true;
     // 권한 요청은 버튼을 누른 즉시 해야 함 (아이폰)
     Notification.requestPermission().then(function(perm){
       if (perm !== 'granted') throw new Error('알림이 허용되지 않았습니다. 휴대폰 설정에서 알림을 허용해 주세요.');
-      return subscribe(pickTeam);
+      return subscribe(pickTeam, { sid: sid, name: name });
     }).then(function(){
       pushSheet.classList.remove('show'); pushBar.classList.remove('show'); showFab();
       toast(change ? '알림 팀을 ' + teamLabel(pickTeam) + '(으)로 바꿨어요' : '알림이 켜졌어요 (' + teamLabel(pickTeam) + ')');
@@ -225,7 +245,7 @@
   window.addEventListener('message', function(e){
     var host = ''; try { host = new URL(e.origin).hostname; } catch (_) {}
     if (!/\.googleusercontent\.com$/.test(host) || !e.data || e.data.type !== 'trip-team' || TEAMS.indexOf(e.data.team) < 0) return;
-    store('myTeam', e.data.team);
+    store('myTeam', e.data.team); store('mySid', e.data.sid || ''); store('myName', e.data.name || '');
     if (!load('pushTeam')) { pickTeam = e.data.team; markTeams(); }
   });
 
@@ -235,7 +255,16 @@
       pushCfg = c;
       if (Notification.permission === 'granted' && load('pushTeam')) {
         showFab();
-        subscribe(load('pushTeam')).catch(function(){});   // 토큰 갱신
+        subscribe(load('pushTeam'), { refresh: true }).then(function(r){   // 토큰 갱신 + 선생님이 바꾼 팀 반영
+          showFab();
+          if (r.removed) { pushBar.classList.add('show'); return; }
+          if (!r.name) {   // 이름 없이 등록된 예전 휴대폰: 이름 등록 안내
+            pushBar.querySelector('.t b').textContent = '알림 받는 사람 등록';
+            pushBar.querySelector('.t span').textContent = '선생님이 확인할 수 있게 학번·이름을 적어 주세요';
+            document.getElementById('pushBtn').textContent = '등록';
+            pushBar.classList.add('show');
+          }
+        }).catch(function(){});
       } else if (Notification.permission !== 'denied') {
         var later = Number(load('pushLater') || 0);
         if (Date.now() - later > 12 * 3600 * 1000) pushBar.classList.add('show');
