@@ -92,7 +92,7 @@
       <button data-t="A">A팀</button><button data-t="B">B팀</button><button data-t="C">C팀</button><button data-t="교사">교사</button>
     </div>
     <div class="who">
-      <input id="pushSid" inputmode="numeric" maxlength="5" placeholder="학번 (예: 20528)" autocomplete="off">
+      <input id="pushSid" inputmode="numeric" maxlength="5" placeholder="학번 (선생님은 번호)" autocomplete="off">
       <input id="pushName" maxlength="30" placeholder="이름" autocomplete="off">
     </div>
     <button id="pushOk">알림 켜기</button>
@@ -184,7 +184,6 @@
   }
   function markTeams(){
     document.querySelectorAll('#pushTeams button').forEach(function(b){ b.classList.toggle('on', b.dataset.t === pickTeam); });
-    document.getElementById('pushSid').style.display = pickTeam === '교사' ? 'none' : '';   // 교사는 이름만
   }
   document.querySelectorAll('#pushTeams button').forEach(function(b){ b.onclick = function(){ pickTeam = b.dataset.t; markTeams(); }; });
 
@@ -226,8 +225,7 @@
   document.getElementById('pushOk').onclick = function(){
     if (TEAMS.indexOf(pickTeam) < 0){ toast('먼저 팀을 골라 주세요.'); return; }
     var sid = document.getElementById('pushSid').value.trim(), name = document.getElementById('pushName').value.trim();
-    if (pickTeam === '교사') sid = '';
-    else if (!/^\d{5}$/.test(sid)) { toast('학번 5자리를 입력해 주세요.'); return; }
+    if (!/^\d{3,5}$/.test(sid)) { toast('학번(선생님은 번호)을 입력해 주세요.'); return; }
     if (name.length < 2) { toast('이름을 입력해 주세요.'); return; }
     var btn = this, change = !!load('pushTeam'); btn.disabled = true;
     // 권한 요청은 버튼을 누른 즉시 해야 함 (아이폰)
